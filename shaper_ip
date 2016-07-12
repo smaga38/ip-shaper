@@ -1,0 +1,112 @@
+#!/bin/sh
+# kFreeBSD do not accept scripts as interpreters, using #!/bin/sh and sourcing.
+#if [ true != "$INIT_D_SCRIPT_SOURCED" ] ; then
+#    set "$0" "$@"; INIT_D_SCRIPT_SOURCED=true . /lib/init/init-d-script
+#fi
+### BEGIN INIT INFO
+# Provides:          /etc/init.d/shaper
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Shaper traffic
+# Description:       shaper - Сервис установки приоритетов и ограничения скорости входящего и исходящего трафика
+#                    DEV - интерфейс на котором нужно установить ограничения
+#                    RATEUP - требуемое ограничение скорости исходящего трафика
+#                    RATEDN - требуемое ограничение скорости входящего tcp трафика
+#                    RATEAPP - требуемое ограничение скорости исходящего трафика для определенного ip
+#                    IPDST - адрес для которого режем исходящую скорость
+#                    RATEAPPMAX - максимально возможная скорость для трафика ограниченного $RATEAPP 
+#                    RATEEND - $[$RATEUP - $RATEAPP]
+#                    BRSIN(OUT) - длина буфера очереди в байтах, примерное значение
+#                    вычисляется по формуле:
+#                    normal burst = configured rate * (1 byte)/(8 bits) * 1.5 seconds
+#                    extended burst = 2 * normal burst
+### END INIT INFO
+
+# Author: Sergey Smagin <smaga388@gmail.com>
+#
+DEV=eth0
+RATEUP=10Mbit
+RATEDN=10Mbit
+RATEAPP=2Mbit
+RATEAPPMAX=5Mbit
+RATEEND=8Mbit
+BRSIN=2m
+BRSOUT=2m
+IPDST=
+
+# Сбросить все в известное состояние (очищеное)
+do_stop () {
+    tc qdisc del dev $DEV root
+    tc qdisc del dev $DEV handle ffff: ingress
+    }
+
+#шейпинг
+do_start () {
+#корневая дисциплина
+    tc qdisc add \
+        dev $DEV root handle 1: htb default 50
+#класс ограничитель скорости интерфейса
+    tc class add \
+        dev $DEV parent 1: classid 1:1 htb rate $RATEUP ceil $RATEUP
+#класс ограничитель исходящего трафика для IP-адреса
+    tc class add \
+        dev $DEV parent 1:1 classid 1:10 htb rate $RATEAPP ceil $RATEAPPMAX
+#класс по умолчанию
+    tc class add \
+        dev $DEV parent 1:1 classid 1:50 htb rate $RATEEND ceil $RATEUP
+#фильтр по IP-адресу, отправляет подходящий трафик в 10 класс
+    tc filter add \
+        dev $DEV parent 1: protocol ip prio 1 u32 match ip dst $IPDST flowid 1:10
+# Martin Devera, author of HTB, then recommends SFQ for beneath these classes:
+    tc qdisc add \
+        dev $DEV parent 1:10 handle 10: sfq perturb 10
+    tc qdisc add \
+        dev $DEV parent 1:50 handle 50: sfq perturb 10 
+#основная дисциплина для входящего трафика
+    tc qdisc add \
+        dev $DEV handle ffff: ingress
+    tc filter add \
+        dev $DEV parent ffff:  protocol ip  u32 match ip src 0.0.0.0/0 police rate $RATEDN burst $BRSIN  action drop/continue flowid :1
+}
+
+#состояние и статистика
+statistics () {
+    echo «[qdisc]»
+    tc -s qdisc show dev $DEV
+    echo «[class]»
+    tc -s class show dev $DEV
+    echo «[filter]»
+    tc -s filter show dev $DEV
+    echo "[filter ingress]"
+    tc -s filter show dev $DEV parent ffff:
+}
+
+
+case "$1" in
+    start)
+    echo "starting shaper"
+    do_start
+    ;;
+    stop)
+    echo "stopping shaping"
+    do_stop
+    ;;
+    restart)
+    echo "stopping shaper"
+    do_stop
+    echo "starting shaper"
+    do_start
+    ;;
+    stat)
+        statistics
+    ;;
+    *)
+    echo "Usage: service shaper {start|stop|restart|stat} "
+    exit 1
+    ;;
+esac
+exit 0
+
+
