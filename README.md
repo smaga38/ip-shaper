@@ -6,7 +6,7 @@ ip-shaper - Сервис установки приоритетов и огран
 
 `` # cp ip-shaper /etc/init.d/ ``
 
-`` # chmod +x /etc/init.d/ip-shaper``
+`` # chmod +x /etc/init.d/shaper-ip``
 
 Также необходимо задать значения переменным:
 ```
