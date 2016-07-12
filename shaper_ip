@@ -4,7 +4,7 @@
 #    set "$0" "$@"; INIT_D_SCRIPT_SOURCED=true . /lib/init/init-d-script
 #fi
 ### BEGIN INIT INFO
-# Provides:          /etc/init.d/shaper-ip
+# Provides:          /etc/init.d/shaper_ip
 # Required-Start:    $remote_fs $syslog
 # Required-Stop:     $remote_fs $syslog
 # Default-Start:     2 3 4 5
