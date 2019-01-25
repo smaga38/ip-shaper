@@ -73,11 +73,11 @@ do_start () {
 
 #состояние и статистика
 statistics () {
-    echo «[qdisc]»
+    echo "[qdisc]"
     tc -s qdisc show dev $DEV
-    echo «[class]»
+    echo "[class]"
     tc -s class show dev $DEV
-    echo «[filter]»
+    echo "[filter]"
     tc -s filter show dev $DEV
     echo "[filter ingress]"
     tc -s filter show dev $DEV parent ffff:
@@ -108,5 +108,3 @@ case "$1" in
     ;;
 esac
 exit 0
-
-
